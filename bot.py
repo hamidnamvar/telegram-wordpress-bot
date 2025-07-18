@@ -3,6 +3,7 @@ import time
 import re
 import os
 from flask import Flask
+from datetime import datetime, timedelta
 
 # تنظیمات
 TELEGRAM_TOKEN = '7602351049:AAHSHa1X8RgycROFqnEcxaUJBSTwDt4qcfg'
@@ -64,18 +65,29 @@ def send_to_telegram(text):
     except Exception as e:
         print(f"❌ خطا در اتصال تلگرام: {e}")
 
-# حلقه اصلی بات
+# حلقه اصلی بات با فیلتر تاریخ (یک ماه گذشته)
 def bot_loop():
     sent_post_ids = load_sent_ids()
-    print("🚀 شروع بررسی همه پست‌های وردپرس بدون محدودیت...")
+    print("🚀 شروع بررسی پست‌های وردپرس در ۳۰ روز گذشته...")
 
     while True:
         posts = get_all_posts()
         new_posts = [post for post in reversed(posts) if post['id'] not in sent_post_ids]
 
-        print(f"🔎 تعداد پست‌های جدید: {len(new_posts)}")
+        filtered_posts = []
+        now = datetime.utcnow()
+        one_month_ago = now - timedelta(days=30)
 
         for post in new_posts:
+            post_date_str = post.get('date', '')  # مثال: "2025-07-18T10:00:00"
+            if post_date_str:
+                post_date = datetime.fromisoformat(post_date_str)
+                if post_date >= one_month_ago:
+                    filtered_posts.append(post)
+
+        print(f"🔎 تعداد پست‌های جدید در یک ماه گذشته: {len(filtered_posts)}")
+
+        for post in filtered_posts:
             title = post['title']['rendered']
             link = post['link']
             raw_excerpt = post.get('excerpt', {}).get('rendered', '')
