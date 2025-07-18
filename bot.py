@@ -1,22 +1,48 @@
 import requests
 import time
 import re
+import os
 
+# تنظیمات
 TELEGRAM_TOKEN = '7602351049:AAHSHa1X8RgycROFqnEcxaUJBSTwDt4qcfg'
 CHANNEL_USERNAME = '@sorenbam_post'
 WORDPRESS_API = 'https://sorenbam.ir/wp-json/wp/v2/posts'
+SENT_IDS_FILE = 'sent_ids.txt'
 
-sent_post_ids = set()
+# خواندن IDهای فرستاده‌شده
+def load_sent_ids():
+    if not os.path.exists(SENT_IDS_FILE):
+        return set()
+    with open(SENT_IDS_FILE, 'r') as file:
+        return set(map(int, file.read().splitlines()))
 
-def get_latest_posts():
-    try:
-        response = requests.get(WORDPRESS_API)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        print(f"Error fetching posts: {e}")
-        return []
+# ذخیره ID جدید
+def save_sent_id(post_id):
+    with open(SENT_IDS_FILE, 'a') as file:
+        file.write(f"{post_id}\n")
 
+# گرفتن همه پست‌ها با صفحه‌بندی
+def get_all_posts():
+    all_posts = []
+    page = 1
+    while True:
+        try:
+            url = f"{WORDPRESS_API}?per_page=100&page={page}"
+            response = requests.get(url)
+            if response.status_code == 400:
+                break
+            response.raise_for_status()
+            posts = response.json()
+            if not posts:
+                break
+            all_posts.extend(posts)
+            page += 1
+        except Exception as e:
+            print(f"خطا در صفحه {page}: {e}")
+            break
+    return all_posts
+
+# ارسال پیام به تلگرام
 def send_to_telegram(text):
     url = f'https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage'
     payload = {
@@ -32,10 +58,14 @@ def send_to_telegram(text):
     except Exception as e:
         print(f"Error sending to Telegram: {e}")
 
+# پردازش و ارسال پست‌ها
 def main():
-    global sent_post_ids
+    sent_post_ids = load_sent_ids()
+
+    print("🔁 شروع بررسی پست‌های وردپرس...")
+
     while True:
-        posts = get_latest_posts()
+        posts = get_all_posts()
         new_posts = [post for post in reversed(posts) if post['id'] not in sent_post_ids]
 
         for post in new_posts:
@@ -43,16 +73,16 @@ def main():
             link = post['link']
             raw_excerpt = post.get('excerpt', {}).get('rendered', '')
             clean_excerpt = re.sub('<[^<]+?>', '', raw_excerpt).strip()
-
             message = f"📢 <b>{title}</b>\n\n{clean_excerpt}\n\n<a href='{link}'>📖 مشاهده مطلب در سایت</a>"
 
             send_to_telegram(message)
             sent_post_ids.add(post['id'])
+            save_sent_id(post['id'])
 
-            time.sleep(30)  # فاصله ارسال هر پست به ثانیه، میتونی این عدد رو تغییر بدی
+            time.sleep(30)  # فاصله بین ارسال پست‌ها
 
         if not new_posts:
-            time.sleep(60)  # وقتی پستی جدید نبود، ۶۰ ثانیه منتظر بمون
+            time.sleep(60)  # اگر پست جدید نبود، ۶۰ ثانیه صبر کن
 
 if __name__ == '__main__':
     main()
