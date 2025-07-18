@@ -1,5 +1,6 @@
 import requests
 import time
+import re
 
 TELEGRAM_TOKEN = '7602351049:AAHSHa1X8RgycROFqnEcxaUJBSTwDt4qcfg'
 CHANNEL_USERNAME = '@sorenbam_post'
@@ -35,22 +36,23 @@ def main():
     global sent_post_ids
     while True:
         posts = get_latest_posts()
-        for post in reversed(posts):  # ارسال به ترتیب انتشار
-            post_id = post['id']
-            if post_id not in sent_post_ids:
-                title = post['title']['rendered']
-                link = post['link']
-                
-                # استخراج خلاصه مطلب و حذف تگ‌های HTML اضافی
-                import re
-                raw_excerpt = post.get('excerpt', {}).get('rendered', '')
-                # حذف تگ‌های HTML از خلاصه
-                clean_excerpt = re.sub('<[^<]+?>', '', raw_excerpt).strip()
-                
-                # ساخت پیام با فرمت HTML و خلاصه
-                message = f"📢 <b>{title}</b>\n\n{clean_excerpt}\n\n<a href='{link}'>📖 مشاهده مطلب در سایت</a>"
-                
-                send_to_telegram(message)
-                sent_post_ids.add(post_id)
-        time.sleep(60)  # هر ۶۰ ثانیه چک کن
+        new_posts = [post for post in reversed(posts) if post['id'] not in sent_post_ids]
 
+        for post in new_posts:
+            title = post['title']['rendered']
+            link = post['link']
+            raw_excerpt = post.get('excerpt', {}).get('rendered', '')
+            clean_excerpt = re.sub('<[^<]+?>', '', raw_excerpt).strip()
+
+            message = f"📢 <b>{title}</b>\n\n{clean_excerpt}\n\n<a href='{link}'>📖 مشاهده مطلب در سایت</a>"
+
+            send_to_telegram(message)
+            sent_post_ids.add(post['id'])
+
+            time.sleep(30)  # فاصله ارسال هر پست به ثانیه، میتونی این عدد رو تغییر بدی
+
+        if not new_posts:
+            time.sleep(60)  # وقتی پستی جدید نبود، ۶۰ ثانیه منتظر بمون
+
+if __name__ == '__main__':
+    main()
