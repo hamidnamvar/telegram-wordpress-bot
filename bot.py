@@ -35,15 +35,22 @@ def main():
     global sent_post_ids
     while True:
         posts = get_latest_posts()
-        for post in reversed(posts):  # برای ارسال به ترتیب انتشار
+        for post in reversed(posts):  # ارسال به ترتیب انتشار
             post_id = post['id']
             if post_id not in sent_post_ids:
                 title = post['title']['rendered']
                 link = post['link']
-                message = f"📢 <b>{title}</b>\n{link}"
+                
+                # استخراج خلاصه مطلب و حذف تگ‌های HTML اضافی
+                import re
+                raw_excerpt = post.get('excerpt', {}).get('rendered', '')
+                # حذف تگ‌های HTML از خلاصه
+                clean_excerpt = re.sub('<[^<]+?>', '', raw_excerpt).strip()
+                
+                # ساخت پیام با فرمت HTML و خلاصه
+                message = f"📢 <b>{title}</b>\n\n{clean_excerpt}\n\n<a href='{link}'>📖 مشاهده مطلب در سایت</a>"
+                
                 send_to_telegram(message)
                 sent_post_ids.add(post_id)
         time.sleep(60)  # هر ۶۰ ثانیه چک کن
 
-if __name__ == '__main__':
-    main()
