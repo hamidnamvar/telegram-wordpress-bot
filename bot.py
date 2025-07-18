@@ -2,12 +2,15 @@ import requests
 import time
 import re
 import os
+from flask import Flask
 
 # تنظیمات
 TELEGRAM_TOKEN = '7602351049:AAHSHa1X8RgycROFqnEcxaUJBSTwDt4qcfg'
 CHANNEL_USERNAME = '@sorenbam_post'
 WORDPRESS_API = 'https://sorenbam.ir/wp-json/wp/v2/posts'
 SENT_IDS_FILE = 'sent_ids.txt'
+
+app = Flask(__name__)
 
 # خواندن IDهای فرستاده‌شده
 def load_sent_ids():
@@ -58,8 +61,8 @@ def send_to_telegram(text):
     except Exception as e:
         print(f"Error sending to Telegram: {e}")
 
-# پردازش و ارسال پست‌ها
-def main():
+# حلقه اصلی بات که پست‌ها رو می‌فرسته
+def bot_loop():
     sent_post_ids = load_sent_ids()
 
     print("🔁 شروع بررسی پست‌های وردپرس...")
@@ -79,10 +82,23 @@ def main():
             sent_post_ids.add(post['id'])
             save_sent_id(post['id'])
 
-            time.sleep(30)  # فاصله بین ارسال پست‌ها
+            time.sleep(30)  # فاصله ارسال پست‌ها
 
         if not new_posts:
-            time.sleep(60)  # اگر پست جدید نبود، ۶۰ ثانیه صبر کن
+            time.sleep(60)  # اگر پست جدید نبود، صبر کن
+
+# مسیر سلامت سرور
+@app.route('/')
+def home():
+    return "بات سورن‌بام فعال است 🚀"
 
 if __name__ == '__main__':
-    main()
+    import threading
+
+    # اجرای بات در ترد جدا
+    t = threading.Thread(target=bot_loop)
+    t.daemon = True
+    t.start()
+
+    # اجرای سرور Flask روی پورت 8080
+    app.run(host='0.0.0.0', port=8080)
